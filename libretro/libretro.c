@@ -11,7 +11,7 @@
 #ifdef HAVE_LIBNX
 #include <switch.h>
 #endif
-
+#include <pthread.h>
 #include <glsm/glsmsym.h>
 
 #include "api/m64p_frontend.h"
@@ -50,6 +50,7 @@
 
 #define ISHEXDEC ((codeLine[cursor]>='0') && (codeLine[cursor]<='9')) || ((codeLine[cursor]>='a') && (codeLine[cursor]<='f')) || ((codeLine[cursor]>='A') && (codeLine[cursor]<='F'))
 
+extern void call_cmd_loop();
 struct retro_perf_callback perf_cb;
 retro_get_cpu_features_t perf_get_cpu_features_cb = NULL;
 
@@ -122,6 +123,7 @@ uint32_t BackgroundMode = 0; // 0 is bgOnePiece
 uint32_t EnableEnhancedTextureStorage;
 uint32_t EnableEnhancedHighResStorage;
 uint32_t ForceDisableExtraMem = 0;
+uint32_t EnableNativeResFactor = 0;
 
 // Overscan options
 #define GLN64_OVERSCAN_SCALING "0|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40|41|42|43|44|45|46|47|48|49|50"
@@ -366,7 +368,7 @@ static void emu_step_initialize(void)
     plugin_connect_all();
 }
 
-static void EmuThreadFunction(void)
+static void EmuThreadFunction(void* param)
 {
     log_cb(RETRO_LOG_DEBUG, CORE_NAME ": [EmuThread] M64CMD_EXECUTE\n");
 
@@ -450,6 +452,7 @@ void copy_file(char * ininame, char * fileName)
     }
 }
 
+
 void retro_init(void)
 {
     char* sys_pathname;
@@ -483,13 +486,13 @@ void retro_init(void)
     initializing = true;
 
     retro_thread = co_active();
-    game_thread = co_create(65536 * sizeof(void*) * 16, EmuThreadFunction);
+    game_thread = co_create(65536 * sizeof(void*) * 16, call_cmd_loop);
 }
 
 void retro_deinit(void)
 {
     CoreDoCommand(M64CMD_STOP, 0, NULL);
-    co_switch(game_thread); /* Let the core thread finish */
+    //co_switch(game_thread); /* Let the core thread finish */
     deinit_audio_libretro();
 
     if (perf_cb.perf_log)
@@ -850,6 +853,15 @@ void update_variables()
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
     {
         sscanf(var.value, "%dx%d", &retro_screen_width, &retro_screen_height);
+
+        // Sanity check... not optimal since we will render at a higher res, but otherwise
+        // GLideN64 might blit a bigger image onto a smaller framebuffer
+        // This is a recent regression.
+        if(retro_screen_width == 320 && retro_screen_height == 240 ||
+           retro_screen_width == 640 && retro_screen_height == 360)
+        {
+            EnableNativeResFactor = 1; // Force factor == 1
+        }
     }
 
     var.key = CORE_NAME "-astick-deadzone";
@@ -994,7 +1006,7 @@ static void format_saved_memory(void)
     format_mempak(saved_memory.mempack + 3 * MEMPAK_SIZE);
 }
 
-static void context_reset(void)
+void context_reset(void)
 {
     static bool first_init = true;
     log_cb(RETRO_LOG_DEBUG, CORE_NAME ": context_reset()\n");
@@ -1066,18 +1078,31 @@ void retro_run (void)
 {
     libretro_swap_buffer = false;
     static bool updated = false;
+    static bool initial = false;
     
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated) {
         update_controllers();
     }
 
+    if(!initial)
+    {
+#ifndef HAVE_LIBNX
+        pthread_t thread;
+        pthread_create(&thread, NULL, &EmuThreadFunction, NULL);
+#else
+        Thread* thread = (Thread*)malloc(sizeof(Thread));
+        u32 thread_priority = 0;
+        svcGetThreadPriority(&thread_priority, CUR_THREAD_HANDLE);
+        threadCreate(thread, EmuThreadFunction, NULL, 1024 * 1024 * 12, thread_priority - 1, 2);
+        threadStart(thread);
+#endif
+        initial = true;
+    }
+    
     glsm_ctl(GLSM_CTL_STATE_BIND, NULL);
     co_switch(game_thread);
     glsm_ctl(GLSM_CTL_STATE_UNBIND, NULL);
-    if (libretro_swap_buffer)
-        video_cb(RETRO_HW_FRAME_BUFFER_VALID, retro_screen_width, retro_screen_height, 0);
-    else if(EnableFrameDuping)
-        video_cb(NULL, retro_screen_width, retro_screen_height, 0);
+    video_cb(RETRO_HW_FRAME_BUFFER_VALID, retro_screen_width, retro_screen_height, 0);
 }
 
 void retro_reset (void)
@@ -1213,7 +1238,7 @@ void retro_cheat_set(unsigned index, bool enabled, const char* codeLine)
 
 void retro_return(void)
 {
-    co_switch(retro_thread);
+    //co_switch(retro_thread);
 }
 
 uint32_t get_retro_screen_width()
