@@ -232,7 +232,7 @@ else ifneq (,$(findstring odroid64,$(platform)))
       CPUFLAGS += -mcpu=cortex-a73.cortex-a53
       GLES = 0
       GLES3= 1
-      GL_LIB := -lGLESv3
+      GL_LIB := -lGLESv2
    endif
 
    COREFLAGS += -DOS_LINUX
