@@ -20,6 +20,10 @@
 #include "RingBufferPool.h"
 #include <string.h> // memcpy
 
+#include <mupen64plus-next_common.h>
+#include <libco.h>
+extern "C" cothread_t retro_thread;
+
 #ifdef MUPENPLUSAPI
 #include <mupenplus/GLideN64_mupenplus.h>
 #else
@@ -62,6 +66,42 @@ private:
 	GLenum m_sfactor;
 	GLenum m_dfactor;
 };
+
+class GlBlendFuncSeparateCommand : public OpenGlCommand
+{
+public:
+	GlBlendFuncSeparateCommand() :
+		OpenGlCommand(false, false, "glBlendFuncSeparate")
+	{
+	}
+
+	static std::shared_ptr<OpenGlCommand> get(GLenum sfactorcolor, GLenum dfactorcolor, GLenum sfactoralpha, GLenum dfactoralpha)
+	{
+		static int poolId = OpenGlCommandPool::get().getNextAvailablePool();
+		auto ptr = getFromPool<GlBlendFuncSeparateCommand>(poolId);
+		ptr->set(sfactorcolor, dfactorcolor, sfactoralpha, dfactoralpha);
+		return ptr;
+	}
+
+	void commandToExecute() override
+	{
+		ptrBlendFuncSeparate(m_sfactorcolor, m_dfactorcolor, m_sfactoralpha, m_dfactoralpha);
+	}
+private:
+	void set(GLenum sfactorcolor, GLenum dfactorcolor, GLenum sfactoralpha, GLenum dfactoralpha)
+	{
+		m_sfactorcolor = sfactorcolor;
+		m_dfactorcolor = dfactorcolor;
+		m_sfactoralpha = sfactoralpha;
+		m_dfactoralpha = dfactoralpha;
+	}
+
+	GLenum m_sfactorcolor;
+	GLenum m_dfactorcolor;
+	GLenum m_sfactoralpha;
+	GLenum m_dfactoralpha;
+};
+
 
 class GlPixelStoreiCommand : public OpenGlCommand
 {
@@ -4719,6 +4759,122 @@ private:
 	}
 };
 
+class GlCopyTexImage2DCommand : public OpenGlCommand
+{
+public:
+	GlCopyTexImage2DCommand() :
+			OpenGlCommand(false, false, "glCopyTexImage2D")
+	{
+	}
+
+	static std::shared_ptr<OpenGlCommand> get(GLenum target, GLint level, GLenum internalformat, GLint x, GLint y, GLsizei width, GLsizei height, GLint border)
+	{
+		static int poolId = OpenGlCommandPool::get().getNextAvailablePool();
+		auto ptr = getFromPool<GlCopyTexImage2DCommand>(poolId);
+		ptr->set(target, level, internalformat, x, y, width, height, border);
+		return ptr;
+	}
+
+	void commandToExecute() override
+	{
+		ptrCopyTexImage2D(m_target, m_level, m_internalformat, m_x, m_y, m_width, m_height, m_border);
+	}
+
+private:
+	void set(GLenum target, GLint level, GLenum internalformat, GLint x, GLint y, GLsizei width, GLsizei height, GLint border)
+	{
+		m_target = target;
+		m_level = level;
+		m_internalformat = internalformat;
+		m_x = x;
+		m_y = y;
+		m_width = width;
+		m_height = height;
+		m_border = border;
+	}
+
+	GLenum m_target;
+	GLint m_level;
+	GLenum m_internalformat;
+	GLint m_x;
+	GLint m_y;
+	GLsizei m_width;
+	GLsizei m_height;
+	GLint m_border;
+};
+
+class GlDebugMessageCallbackCommand : public OpenGlCommand
+{
+	public:
+	GlDebugMessageCallbackCommand() :
+				OpenGlCommand(true, false, "glDebugMessageCallback")
+	{
+	}
+
+	static std::shared_ptr<OpenGlCommand> get(GLDEBUGPROC callback, const void *userParam)
+	{
+		static int poolId = OpenGlCommandPool::get().getNextAvailablePool();
+		auto ptr = getFromPool<GlDebugMessageCallbackCommand>(poolId);
+		ptr->set(callback, userParam);
+		return ptr;
+	}
+
+	void commandToExecute() override
+	{
+		ptrDebugMessageCallback(m_callback, m_userParam);
+	}
+
+private:
+	void set(GLDEBUGPROC callback, const void *userParam)
+	{
+		m_callback = callback;
+		m_userParam = userParam;
+	}
+
+	GLDEBUGPROC m_callback;
+	const void* m_userParam;
+};
+
+class GlDebugMessageControlCommand : public OpenGlCommand
+{
+public:
+	GlDebugMessageControlCommand() :
+			OpenGlCommand(true, false, "glDebugMessageControl")
+	{
+	}
+
+	static std::shared_ptr<OpenGlCommand> get(GLenum source, GLenum type, GLenum severity, GLsizei count, const GLuint *ids, GLboolean enabled)
+	{
+		static int poolId = OpenGlCommandPool::get().getNextAvailablePool();
+		auto ptr = getFromPool<GlDebugMessageControlCommand>(poolId);
+		ptr->set(source, type, severity, count, ids, enabled);
+		return ptr;
+	}
+
+	void commandToExecute() override
+	{
+		ptrDebugMessageControl(m_source, m_type, m_severity, m_count, m_ids, m_enabled);
+	}
+
+private:
+	void set(GLenum source, GLenum type, GLenum severity, GLsizei count, const GLuint *ids, GLboolean enabled)
+	{
+		m_source = source;
+		m_type = type;
+		m_severity = severity;
+		m_count = count;
+		m_ids = ids;
+		m_enabled = enabled;
+	}
+
+	GLenum m_source;
+	GLenum m_type;
+	GLenum m_severity;
+	GLsizei m_count;
+	const GLuint* m_ids;
+	GLboolean m_enabled;
+};
+
 class GlEGLImageTargetTexture2DOESCommand : public OpenGlCommand
 {
 public:
@@ -4738,6 +4894,38 @@ public:
 	void commandToExecute() override
 	{
 		ptrEGLImageTargetTexture2DOES(m_target, m_image);
+	}
+
+private:
+	void set(GLenum target, void* image)
+	{
+		m_target = target;
+		m_image = image;
+	}
+
+	GLenum m_target;
+	void* m_image;
+};
+
+class GlEGLImageTargetRenderbufferStorageOESCommand : public OpenGlCommand
+{
+public:
+	GlEGLImageTargetRenderbufferStorageOESCommand() :
+			OpenGlCommand(false, false, "glEGLImageTargetRenderbufferStorageOES")
+	{
+	}
+
+	static std::shared_ptr<OpenGlCommand> get(GLenum target, void* image)
+	{
+		static int poolId = OpenGlCommandPool::get().getNextAvailablePool();
+		auto ptr = getFromPool<GlEGLImageTargetRenderbufferStorageOESCommand>(poolId);
+		ptr->set(target, image);
+		return ptr;
+	}
+
+	void commandToExecute() override
+	{
+		ptrEGLImageTargetRenderbufferStorageOES(m_target, m_image);
 	}
 
 private:
@@ -4825,11 +5013,11 @@ public:
 	{
 	}
 
-	static std::shared_ptr<OpenGlCommand> get()
+	static std::shared_ptr<OpenGlCommand> get(m64p_error& returnValue)
 	{
 		static int poolId = OpenGlCommandPool::get().getNextAvailablePool();
 		auto ptr = getFromPool<CoreVideoInitCommand>(poolId);
-		ptr->set();
+		ptr->set(returnValue);
 		return ptr;
 	}
 
@@ -4841,9 +5029,11 @@ public:
 	}
 
 private:
-	void set()
+	void set(m64p_error& returnValue)
 	{
+		m_returnValue = &returnValue;
 	}
+	m64p_error* m_returnValue;
 };
 
 class CoreVideoQuitCommand : public OpenGlCommand
@@ -4918,6 +5108,57 @@ private:
 
 	int m_screenWidth;
 	int m_screenHeight;
+	int m_bitsPerPixel;
+	m64p_video_mode m_mode;
+	m64p_video_flags m_flags;
+	m64p_error* m_returnValue;
+};
+
+class CoreVideoSetVideoModeWithRateCommand : public OpenGlCommand
+{
+public:
+	CoreVideoSetVideoModeWithRateCommand() :
+		OpenGlCommand(true, false, "CoreVideo_SetVideoModeWithRate", false)
+	{
+	}
+
+	static std::shared_ptr<OpenGlCommand> get(int screenWidth, int screenHeight, int refreshRate, int bitsPerPixel, m64p_video_mode mode,
+		m64p_video_flags flags, m64p_error& returnValue)
+	{
+		static int poolId = OpenGlCommandPool::get().getNextAvailablePool();
+		auto ptr = getFromPool<CoreVideoSetVideoModeWithRateCommand>(poolId);
+		ptr->set(screenWidth, screenHeight, refreshRate, bitsPerPixel, mode, flags, returnValue);
+		return ptr;
+	}
+
+	void commandToExecute() override
+	{
+#ifdef __LIBRETRO__
+		*m_returnValue = m64p_error::M64ERR_SUCCESS;
+		glsm_ctl(GLSM_CTL_STATE_CONTEXT_RESET, NULL);
+#else
+		*m_returnValue = ::CoreVideo_SetVideoModeWithRate(m_screenWidth, m_screenHeight, m_refreshRate, m_bitsPerPixel, m_mode, m_flags);
+#endif
+
+		initGLFunctions();
+	}
+
+private:
+	void set(int screenWidth, int screenHeight, int refreshRate, int bitsPerPixel, m64p_video_mode mode,
+		m64p_video_flags flags, m64p_error& returnValue)
+	{
+		m_screenWidth = screenWidth;
+		m_screenHeight = screenHeight;
+		m_refreshRate = refreshRate;
+		m_bitsPerPixel = bitsPerPixel;
+		m_mode = mode;
+		m_flags = flags;
+		m_returnValue = &returnValue;
+	}
+
+	int m_screenWidth;
+	int m_screenHeight;
+	int m_refreshRate;
 	int m_bitsPerPixel;
 	m64p_video_mode m_mode;
 	m64p_video_flags m_flags;
@@ -5012,8 +5253,14 @@ public:
 	{
 #ifndef __LIBRETRO__
 		::CoreVideo_GL_SwapBuffers();
-#endif
+#else
+		libretro_swap_buffer = true;
+		if(EnableThreadedRenderer)
+		{
+			co_switch(retro_thread);
+		}
 		m_swapBuffersCallback();
+#endif
 	}
 
 private:

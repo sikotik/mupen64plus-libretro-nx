@@ -10,7 +10,7 @@
     <x>0</x>
     <y>0</y>
     <width>559</width>
-    <height>685</height>
+    <height>613</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -1131,19 +1131,6 @@
              </widget>
             </item>
             <item>
-             <widget class="QCheckBox" name="emulateNoiseCheckBox">
-              <property name="toolTip">
-               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;This option emulates effects that use random color input. Checking this option may cause rare performance problems.&lt;/p&gt;&lt;p&gt;[Recommended: &lt;span style=&quot; font-style:italic;&quot;&gt;Checked&lt;/span&gt;]&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-              </property>
-              <property name="text">
-               <string>Enable noise</string>
-              </property>
-              <property name="checked">
-               <bool>true</bool>
-              </property>
-             </widget>
-            </item>
-            <item>
              <widget class="QCheckBox" name="enableHWLightingCheckBox">
               <property name="toolTip">
                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;In N64 games lighting is calculated per vertex. This option enables Phong shading, which provides smoother and more realistic lighting.&lt;br/&gt;&lt;br/&gt;[Recommended: &lt;span style=&quot; font-style:italic;&quot;&gt;Your preference&lt;/span&gt;]&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
@@ -1394,6 +1381,86 @@
           </layout>
          </item>
          <item>
+          <widget class="QGroupBox" name="ditheringGroupBox">
+           <property name="title">
+            <string>Dithering</string>
+           </property>
+           <layout class="QGridLayout" name="gridLayout_6">
+            <item row="0" column="1">
+             <widget class="QCheckBox" name="ditheringQuantizationCheckBox">
+              <property name="toolTip">
+               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Like real hardware this setting reduces the number of colors if dithering is used. Removes undesired dithering fragments. Default = enabled.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+              </property>
+              <property name="text">
+               <string>Enable 5bit quantization</string>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="0">
+             <widget class="QCheckBox" name="hiresNoiseDitheringCheckBox">
+              <property name="toolTip">
+               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;This setting doubles noise resolution to get a finer noise effect at higher resolutions. Default = disabled.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+              </property>
+              <property name="text">
+               <string>High resolution noise dithering</string>
+              </property>
+             </widget>
+            </item>
+            <item row="0" column="0">
+             <widget class="QCheckBox" name="ditheringPatternCheckBox">
+              <property name="toolTip">
+               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;This setting enables game controlled ordered grid dithering. Enable it for accurate representation. Default = disabled.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+              </property>
+              <property name="text">
+               <string>Dithering pattern on output image</string>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="1">
+             <layout class="QHBoxLayout" name="horizontalLayout_24">
+              <item>
+               <widget class="QLabel" name="ditheringLabel">
+                <property name="toolTip">
+                 <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;RDRAM dithering prevents color banding in games with framebuffer effects.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                </property>
+                <property name="text">
+                 <string>RDRAM image dithering:</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QComboBox" name="ditheringModeComboBox">
+                <property name="toolTip">
+                 <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Settings: Disabled, Bayer ordered grid dithering, Magic Square ordered grid dithering or blue noise dithering. Blue noise dithering produces unobtrusive results. Default = blue noise dithering.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                </property>
+                <item>
+                 <property name="text">
+                  <string>disable</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>Bayer</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>Magic square</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>Blue noise</string>
+                 </property>
+                </item>
+               </widget>
+              </item>
+             </layout>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
           <widget class="QGroupBox" name="nativeRes2DGroupBox">
            <property name="title">
             <string>2D elements</string>
@@ -1420,22 +1487,45 @@
                <number>0</number>
               </property>
               <item>
+               <layout class="QHBoxLayout" name="nativeRes2Dlayout">
+                <item>
+                 <widget class="QLabel" name="nativeRes2DLabel">
+                  <property name="toolTip">
+                   <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;When checked, 2D elements are rendered at the N64s resolution before copying them to output. This usually eliminates display issues with 2D elements, but it can be slow. This option uses heuristics to detect adjacent 2D elements that doesn't work for every game.&lt;/p&gt;&lt;p&gt;[Recommended: &lt;span style=&quot; font-style:italic;&quot;&gt;Checked, unless you have performance problems&lt;/span&gt;]&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                  </property>
+                  <property name="text">
+                   <string>Render 2D elements in N64 resolution (best quality, can be slow):</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QComboBox" name="nativeRes2DComboBox">
+                  <property name="toolTip">
+                   <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;When checked, 2D elements are rendered at the N64s resolution before copying them to output. This usually eliminates display issues with 2D elements, but it can be slow. This option uses heuristics to detect adjacent 2D elements that doesn't work for every game.&lt;/p&gt;&lt;p&gt;[Recommended: &lt;span style=&quot; font-style:italic;&quot;&gt;Checked, unless you have performance problems&lt;/span&gt;]&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                  </property>
+                  <item>
+                   <property name="text">
+                    <string>Disable</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>Enable optimized</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>Enable unoptimized</string>
+                   </property>
+                  </item>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+              <item>
                <widget class="QCheckBox" name="halosRemovalCheckBox">
                 <property name="text">
                  <string>Try to remove colored halos around transparent objects</string>
-                </property>
-               </widget>
-              </item>
-              <item>
-               <widget class="QCheckBox" name="nativeRes2D_checkBox">
-                <property name="toolTip">
-                 <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;When checked, 2D elements are rendered at the N64s resolution before copying them to output. This usually eliminates display issues with 2D elements, but it can be slow. This option uses heuristics to detect adjacent 2D elements that doesn't work for every game.&lt;/p&gt;&lt;p&gt;[Recommended: &lt;span style=&quot; font-style:italic;&quot;&gt;Checked, unless you have performance problems&lt;/span&gt;]&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                </property>
-                <property name="text">
-                 <string extracomment="2D elements, formerly labelled texrects, are usually used for title screens or HUDs">Render 2D elements in N64 resolution (best quality, can be slow)</string>
-                </property>
-                <property name="checked">
-                 <bool>true</bool>
                 </property>
                </widget>
               </item>
@@ -2036,14 +2126,40 @@
                       <number>4</number>
                      </property>
                      <item>
-                      <widget class="QCheckBox" name="n64DepthCompareCheckBox">
-                       <property name="toolTip">
-                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The N64 uses a unique method of calculating depth to the camera. When checked, GlideN64 uses shaders to try to emulate these calculations correctly. Not compatible with anti-aliasing. &lt;span style=&quot; font-weight:600;&quot;&gt;Experimental!&lt;/span&gt;&lt;/p&gt;&lt;p&gt;[Recommended: &lt;span style=&quot; font-style:italic;&quot;&gt;Sometimes checked, for a few games&lt;/span&gt;]&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                       </property>
-                       <property name="text">
-                        <string>Enable N64-style depth compare (experimental, disables MSAA)</string>
-                       </property>
-                      </widget>
+                      <layout class="QHBoxLayout" name="n64DepthCompareHorizontalLayout">
+                       <item>
+                        <widget class="QLabel" name="n64DepthCompareLabel">
+                         <property name="toolTip">
+                          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The N64 uses a unique method of calculating depth to the camera. When enabled, GlideN64 uses shaders to try to emulate these calculations correctly. Not compatible with anti-aliasing. &lt;span style=&quot; font-weight:600;&quot;&gt;Experimental!&lt;/span&gt;&lt;/p&gt;&lt;p&gt;Fast mode requires OpenGL 4.2 and &amp;quot;fragment shader interlock&amp;quot; extensions.&lt;/p&gt;&lt;p&gt;Compatible mode requires only core OpenGL 4.2 &lt;span style=&quot; font-weight:600;&quot;&gt;Can be slow!&lt;/span&gt;&lt;/p&gt;&lt;p&gt;[Recommended: &lt;span style=&quot; font-style:italic;&quot;&gt;Sometimes checked, for several games&lt;/span&gt;]&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                         </property>
+                         <property name="text">
+                          <string>N64-style depth compare (experimental, disables MSAA)</string>
+                         </property>
+                        </widget>
+                       </item>
+                       <item>
+                        <widget class="QComboBox" name="n64DepthCompareComboBox">
+                         <property name="toolTip">
+                          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The N64 uses a unique method of calculating depth to the camera. When enabled, GlideN64 uses shaders to try to emulate these calculations correctly. Not compatible with anti-aliasing. &lt;span style=&quot; font-weight:600;&quot;&gt;Experimental!&lt;/span&gt;&lt;/p&gt;&lt;p&gt;Fast mode requires OpenGL 4.2 and &amp;quot;fragment shader interlock&amp;quot; extensions.&lt;/p&gt;&lt;p&gt;Compatible mode requires only core OpenGL 4.2 &lt;span style=&quot; font-weight:600;&quot;&gt;Can be slow!&lt;/span&gt;&lt;/p&gt;&lt;p&gt;[Recommended: &lt;span style=&quot; font-style:italic;&quot;&gt;Sometimes checked, for several games&lt;/span&gt;]&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                         </property>
+                         <item>
+                          <property name="text">
+                           <string>Disable</string>
+                          </property>
+                         </item>
+                         <item>
+                          <property name="text">
+                           <string>Fast</string>
+                          </property>
+                         </item>
+                         <item>
+                          <property name="text">
+                           <string>Compatible</string>
+                          </property>
+                         </item>
+                        </widget>
+                       </item>
+                      </layout>
                      </item>
                      <item>
                       <widget class="QCheckBox" name="forceDepthBufferClearCheckBox">
@@ -2563,6 +2679,9 @@
                </item>
                <item>
                 <widget class="QCheckBox" name="hiresTexFileStorageCheckBox">
+                 <property name="toolTip">
+                  <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;This option enables alternative storage for hi-res textures.&lt;/p&gt;&lt;p&gt;Normally memory cache is used. It keeps all hi-res textures in RAM and thus limited by available RAM size.&lt;/p&gt;&lt;p&gt;File storage keeps texture cache on HDD. It is slower than memory cache, but has virtually no limits on cache size.&lt;/p&gt;&lt;p&gt;Disable &amp;quot;Compress texture cache&amp;quot; option for better performance.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                 </property>
                  <property name="text">
                   <string>Use file storage instead of memory cache</string>
                  </property>
@@ -2574,10 +2693,20 @@
                   <bool>true</bool>
                  </property>
                  <property name="toolTip">
-                  <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;This option dumps textures on screen to a texture pack folder. You can also reload textures while the game is running to see how they look instantly—big time saver!&lt;/p&gt;&lt;p&gt;Hotkeys:&lt;br/&gt;Use &lt;span style=&quot; font-weight:600;&quot;&gt;R&lt;/span&gt; to reload textures from the texture pack&lt;br/&gt;Use &lt;span style=&quot; font-weight:600;&quot;&gt;D&lt;/span&gt; to toggle texture dumping on or off&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                  <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;This option dumps textures on screen to a texture pack folder. &lt;/p&gt;&lt;p&gt;Hotkey:&lt;br/&gt;Use &lt;span style=&quot; font-weight:600;&quot;&gt;D&lt;/span&gt; to toggle texture dumping on or off&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                  </property>
                  <property name="text">
-                  <string>Dump/edit textures</string>
+                  <string>Press 'd' to dump N64 textures (for texture artists)</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QCheckBox" name="textureReloadCheckBox">
+                 <property name="toolTip">
+                  <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;This option allows texture artists to reload hi-res textures while the game is running to instantly see how they look —big time saver!&lt;/p&gt;&lt;p&gt;Hotkey:&lt;br/&gt;Use &lt;span style=&quot; font-weight:600;&quot;&gt;R&lt;/span&gt; to reload textures from the texture pack&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                 </property>
+                 <property name="text">
+                  <string>Press 'r' to reload hi-res textures (for texture artists)</string>
                  </property>
                 </widget>
                </item>
@@ -3770,22 +3899,6 @@
    </hints>
   </connection>
   <connection>
-   <sender>n64DepthCompareCheckBox</sender>
-   <signal>toggled(bool)</signal>
-   <receiver>aliasingWarningFrame</receiver>
-   <slot>setVisible(bool)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>106</x>
-     <y>396</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>524</x>
-     <y>199</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
    <sender>fbInfoEnableCheckBox</sender>
    <signal>toggled(bool)</signal>
    <receiver>readColorChunkCheckBox</receiver>
@@ -3830,38 +3943,6 @@
     <hint type="destinationlabel">
      <x>152</x>
      <y>463</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>n64DepthCompareCheckBox</sender>
-   <signal>toggled(bool)</signal>
-   <receiver>aliasingSliderFrame</receiver>
-   <slot>setDisabled(bool)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>123</x>
-     <y>396</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>420</x>
-     <y>147</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>n64DepthCompareCheckBox</sender>
-   <signal>toggled(bool)</signal>
-   <receiver>msaaRadioButton</receiver>
-   <slot>setDisabled(bool)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>123</x>
-     <y>396</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>420</x>
-     <y>113</y>
     </hint>
    </hints>
   </connection>
@@ -3946,22 +4027,6 @@
    </hints>
   </connection>
   <connection>
-   <sender>nativeRes2D_checkBox</sender>
-   <signal>toggled(bool)</signal>
-   <receiver>fixTexrectFrame</receiver>
-   <slot>setDisabled(bool)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>235</x>
-     <y>350</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>253</x>
-     <y>446</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
    <sender>frameBufferCheckBox</sender>
    <signal>toggled(bool)</signal>
    <receiver>overscanFrame</receiver>
@@ -4011,9 +4076,9 @@
   </connection>
  </connections>
  <buttongroups>
-  <buttongroup name="screenshotButtonGroup"/>
   <buttongroup name="factorButtonGroup"/>
-  <buttongroup name="fixTexrectCoordsButtonGroup"/>
   <buttongroup name="osdButtonGroup"/>
+  <buttongroup name="fixTexrectCoordsButtonGroup"/>
+  <buttongroup name="screenshotButtonGroup"/>
  </buttongroups>
 </ui>

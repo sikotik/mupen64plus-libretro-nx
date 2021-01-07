@@ -156,6 +156,13 @@ void ContextImpl::setScissor(s32 _x, s32 _y, s32 _width, s32 _height)
 void ContextImpl::setBlending(graphics::BlendParam _sfactor, graphics::BlendParam _dfactor)
 {
 	m_cachedFunctions->getCachedBlending()->setBlending(_sfactor, _dfactor);
+	m_cachedFunctions->getCachedBlendingSeparate()->reset();
+}
+
+void ContextImpl::setBlendingSeparate(graphics::BlendParam _sfactorcolor, graphics::BlendParam _dfactorcolor, graphics::BlendParam _sfactoralpha, graphics::BlendParam _dfactoralpha)
+{
+	m_cachedFunctions->getCachedBlendingSeparate()->setBlendingSeparate(_sfactorcolor, _dfactorcolor, _sfactoralpha, _dfactoralpha);
+	m_cachedFunctions->getCachedBlending()->reset();
 }
 
 void ContextImpl::setBlendColor(f32 _red, f32 _green, f32 _blue, f32 _alpha)
@@ -172,8 +179,15 @@ void ContextImpl::clearColorBuffer(f32 _red, f32 _green, f32 _blue, f32 _alpha)
 		m_cachedFunctions->getCachedClearColor()->setClearColor(_red, _green, _blue, _alpha);
 		glClear(GL_COLOR_BUFFER_BIT);
 	} else {
+#if defined(OS_ANDROID)
+		// Using the GLES3 paths causes some background garbage where the Overscan is
+		// TODO: Investigate this
+		m_cachedFunctions->getCachedClearColor()->setClearColor(_red, _green, _blue, _alpha);
+		glClear(GL_COLOR_BUFFER_BIT);
+#else
 		GLfloat values[4] = {_red, _green, _blue, _alpha};
 		glClearBufferfv(GL_COLOR, 0, values);
+#endif // OS_ANDROID
 	}
 
 	enableScissor->enable(true);
@@ -418,14 +432,24 @@ graphics::ShaderProgram * ContextImpl::createTexrectDrawerClearShader()
 	return m_specialShadersFactory->createTexrectDrawerClearShader();
 }
 
-graphics::ShaderProgram * ContextImpl::createTexrectCopyShader()
+graphics::ShaderProgram * ContextImpl::createTexrectUpscaleCopyShader()
 {
-	return m_specialShadersFactory->createTexrectCopyShader();
+	return m_specialShadersFactory->createTexrectUpscaleCopyShader();
 }
 
-graphics::ShaderProgram * ContextImpl::createTexrectColorAndDepthCopyShader()
+graphics::ShaderProgram * ContextImpl::createTexrectColorAndDepthUpscaleCopyShader()
 {
-	return m_specialShadersFactory->createTexrectColorAndDepthCopyShader();
+	return m_specialShadersFactory->createTexrectColorAndDepthUpscaleCopyShader();
+}
+
+graphics::ShaderProgram * ContextImpl::createTexrectDownscaleCopyShader()
+{
+	return m_specialShadersFactory->createTexrectDownscaleCopyShader();
+}
+
+graphics::ShaderProgram * ContextImpl::createTexrectColorAndDepthDownscaleCopyShader()
+{
+	return m_specialShadersFactory->createTexrectColorAndDepthDownscaleCopyShader();
 }
 
 graphics::ShaderProgram * ContextImpl::createGammaCorrectionShader()
@@ -468,7 +492,6 @@ void ContextImpl::drawLine(f32 _width, SPVertex * _vertices)
 	m_graphicsDrawer->drawLine(_width, _vertices);
 }
 
-
 f32 ContextImpl::getMaxLineWidth()
 {
 	GLfloat lineWidthRange[2] = { 0.0f, 0.0f };
@@ -495,12 +518,18 @@ bool ContextImpl::isSupported(graphics::SpecialFeatures _feature) const
 		return !m_glInfo.isGLES2;
 	case graphics::SpecialFeatures::ClipControl:
 		return !m_glInfo.isGLESX;
-	case graphics::SpecialFeatures::FramebufferFetch:
+	case graphics::SpecialFeatures::FramebufferFetchDepth:
 		return m_glInfo.ext_fetch;
+	case graphics::SpecialFeatures::FramebufferFetchColor:
+		return m_glInfo.ext_fetch || m_glInfo.ext_fetch_arm;
 	case graphics::SpecialFeatures::TextureBarrier:
 		return m_glInfo.texture_barrier || m_glInfo.texture_barrierNV;
 	case graphics::SpecialFeatures::EglImage:
 		return m_glInfo.eglImage;
+	case graphics::SpecialFeatures::EglImageFramebuffer:
+		return m_glInfo.eglImageFramebuffer;
+	case graphics::SpecialFeatures::DualSourceBlending:
+		return m_glInfo.dual_source_blending;
 	}
 	return false;
 }

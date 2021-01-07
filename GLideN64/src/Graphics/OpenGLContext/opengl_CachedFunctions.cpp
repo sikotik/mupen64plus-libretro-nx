@@ -7,17 +7,6 @@
 using namespace graphics;
 using namespace opengl;
 
-#ifdef __LIBRETRO__
-#include <glsm/glsm_caps.h>
-// TODO: Fix macro mess
-#undef glDisable
-#undef glEnable
-extern "C" void rglEnable(GLenum cap);
-extern "C" void rglDisable(GLenum cap);
-#define glDisable(T) rglDisable(S##T)
-#define glEnable(T)  rglEnable(S##T)
-#endif // __LIBRETRO__
-
 /*---------------CachedEnable-------------*/
 
 CachedEnable::CachedEnable(Parameter _parameter)
@@ -180,6 +169,15 @@ void CachedBlending::setBlending(Parameter _sfactor, Parameter _dfactor)
 		glBlendFunc(GLenum(_sfactor), GLenum(_dfactor));
 }
 
+/*---------------CachedBlendingSeparate-------------*/
+
+void CachedBlendingSeparate::setBlendingSeparate(Parameter _sfactorcolor, Parameter _dfactorcolor, Parameter _sfactoralpha, Parameter _dfactoralpha)
+{
+	if (update(_sfactorcolor, _dfactorcolor, _sfactoralpha, _dfactoralpha))
+		glBlendFuncSeparate(GLenum(_sfactorcolor), GLenum(_dfactorcolor), GLenum(_sfactoralpha), GLenum(_dfactoralpha));
+}
+
+
 /*---------------CachedBlendColor-------------*/
 
 void CachedBlendColor::setBlendColor(f32 _red, f32 _green, f32 _blue, f32 _alpha)
@@ -329,6 +327,12 @@ CachedBlending * CachedFunctions::getCachedBlending()
 {
 	return &m_blending;
 }
+
+CachedBlendingSeparate * CachedFunctions::getCachedBlendingSeparate()
+{
+	return &m_blendingseparate;
+}
+
 
 CachedBlendColor * CachedFunctions::getCachedBlendColor()
 {

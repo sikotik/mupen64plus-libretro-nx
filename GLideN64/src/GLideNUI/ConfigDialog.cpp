@@ -142,6 +142,11 @@ void ConfigDialog::_init(bool reInit, bool blockCustomSettings)
 		break;
 	}
 
+	ui->ditheringModeComboBox->setCurrentIndex(config.generalEmulation.rdramImageDitheringMode);
+	ui->ditheringQuantizationCheckBox->setChecked(config.generalEmulation.enableDitheringQuantization);
+	ui->hiresNoiseDitheringCheckBox->setChecked(config.generalEmulation.enableHiresNoiseDithering);
+	ui->ditheringPatternCheckBox->setChecked(config.generalEmulation.enableDitheringPattern);
+
 	switch (config.texture.screenShotFormat) {
 	case 0:
 		ui->pngRadioButton->setChecked(true);
@@ -153,7 +158,6 @@ void ConfigDialog::_init(bool reInit, bool blockCustomSettings)
 
 	// Emulation settings
 	ui->emulateLodCheckBox->setChecked(config.generalEmulation.enableLOD != 0);
-	ui->emulateNoiseCheckBox->setChecked(config.generalEmulation.enableNoise != 0);
 	ui->enableHWLightingCheckBox->setChecked(config.generalEmulation.enableHWLighting != 0);
 	ui->enableShadersStorageCheckBox->setChecked(config.generalEmulation.enableShadersStorage != 0);
 	if (!blockCustomSettings)
@@ -182,8 +186,7 @@ void ConfigDialog::_init(bool reInit, bool blockCustomSettings)
 
 	ui->halosRemovalCheckBox->setChecked(config.texture.enableHalosRemoval != 0);
 
-	ui->nativeRes2D_checkBox->toggle();
-	ui->nativeRes2D_checkBox->setChecked(config.graphics2D.enableNativeResTexrects != 0);
+	ui->nativeRes2DComboBox->setCurrentIndex(config.graphics2D.enableNativeResTexrects);
 
 	ui->gammaCorrectionNoteFrame->setHidden(true);
 	ui->gammaLevelSpinBox->setValue(config.gammaCorrection.force != 0 ? config.gammaCorrection.level : 2.0);
@@ -204,8 +207,8 @@ void ConfigDialog::_init(bool reInit, bool blockCustomSettings)
 	ui->copyDepthBufferComboBox->setCurrentIndex(config.frameBufferEmulation.copyDepthToRDRAM);
 	ui->RenderFBCheckBox->setChecked(config.frameBufferEmulation.copyFromRDRAM != 0);
 	ui->copyDepthToMainDepthBufferCheckBox->setChecked(config.frameBufferEmulation.copyDepthToMainDepthBuffer != 0);
-	ui->n64DepthCompareCheckBox->toggle();
-	ui->n64DepthCompareCheckBox->setChecked(config.frameBufferEmulation.N64DepthCompare != 0);
+	ui->n64DepthCompareComboBox->setCurrentIndex(config.frameBufferEmulation.N64DepthCompare);
+	on_n64DepthCompareComboBox_currentIndexChanged(config.frameBufferEmulation.N64DepthCompare);
 	ui->forceDepthBufferClearCheckBox->setChecked(config.frameBufferEmulation.forceDepthBufferClear != 0);
 
 	if (config.video.fxaa != 0)
@@ -267,6 +270,8 @@ void ConfigDialog::_init(bool reInit, bool blockCustomSettings)
 	ui->alternativeCRCCheckBox->setChecked(config.textureFilter.txHresAltCRC != 0);
 	ui->textureDumpCheckBox->toggle();
 	ui->textureDumpCheckBox->setChecked(config.textureFilter.txDump != 0);
+	ui->textureReloadCheckBox->toggle();
+	ui->textureReloadCheckBox->setChecked(config.textureFilter.txReloadHiresTex != 0);
 	ui->force16bppCheckBox->setChecked(config.textureFilter.txForce16bpp != 0);
 	ui->compressCacheCheckBox->setChecked(config.textureFilter.txCacheCompression != 0);
 	ui->saveTextureCacheCheckBox->setChecked(config.textureFilter.txSaveCache != 0);
@@ -368,7 +373,8 @@ void ConfigDialog::setIniPath(const QString & _strIniPath)
 		locale.truncate(locale.lastIndexOf('.')); // "TranslationExample_de"
 		locale.remove(0, locale.indexOf('_') + 1); // "de"
 		QString language = QLocale(locale).nativeLanguageName();
-		language = language.left(1).toUpper() + language.remove(0, 1);
+		QString firstChar = language.left(1).toUpper();
+		language = firstChar + language.remove(0, 1);
 		if (bCurrent) {
 			listIndex = i + 1;
 		}
@@ -430,9 +436,9 @@ void ConfigDialog::accept(bool justSave) {
 	getFullscreenRefreshRate(ui->fullScreenRefreshRateComboBox->currentIndex(), config.video.fullscreenRefresh);
 
 	config.video.fxaa = ui->fxaaRadioButton->isChecked() ? 1 : 0;
-	config.video.multisampling = 
+	config.video.multisampling =
 		(ui->fxaaRadioButton->isChecked()
-			|| ui->n64DepthCompareCheckBox->isChecked()
+			|| ui->n64DepthCompareComboBox->currentIndex() != 0
 			|| ui->noaaRadioButton->isChecked()
 		) ? 0
 		: pow2(ui->aliasingSlider->value());
@@ -442,6 +448,11 @@ void ConfigDialog::accept(bool justSave) {
 		config.texture.bilinearMode = BILINEAR_STANDARD;
 	else if (ui->blnr3PointRadioButton->isChecked())
 		config.texture.bilinearMode = BILINEAR_3POINT;
+
+	config.generalEmulation.rdramImageDitheringMode = ui->ditheringModeComboBox->currentIndex();
+	config.generalEmulation.enableDitheringQuantization = ui->ditheringQuantizationCheckBox->isChecked() ? 1 : 0;
+	config.generalEmulation.enableHiresNoiseDithering = ui->hiresNoiseDitheringCheckBox->isChecked() ? 1 : 0;
+	config.generalEmulation.enableDitheringPattern = ui->ditheringPatternCheckBox->isChecked() ? 1 : 0;
 
 	if (ui->pngRadioButton->isChecked())
 		config.texture.screenShotFormat = 0;
@@ -462,7 +473,6 @@ void ConfigDialog::accept(bool justSave) {
 
 	// Emulation settings
 	config.generalEmulation.enableLOD = ui->emulateLodCheckBox->isChecked() ? 1 : 0;
-	config.generalEmulation.enableNoise = ui->emulateNoiseCheckBox->isChecked() ? 1 : 0;
 	config.generalEmulation.enableHWLighting = ui->enableHWLightingCheckBox->isChecked() ? 1 : 0;
 	config.generalEmulation.enableShadersStorage = ui->enableShadersStorageCheckBox->isChecked() ? 1 : 0;
 	config.generalEmulation.enableCustomSettings = ui->customSettingsCheckBox->isChecked() ? 1 : 0;
@@ -476,14 +486,14 @@ void ConfigDialog::accept(bool justSave) {
 		config.graphics2D.correctTexrectCoords = Config::tcSmart;
 	else if (ui->fixTexrectForceRadioButton->isChecked())
 		config.graphics2D.correctTexrectCoords = Config::tcForce;
-	
+
 	if (ui->bgModeOnePieceRadioButton->isChecked())
 		config.graphics2D.bgMode = Config::BGMode::bgOnePiece;
 	else if (ui->bgModeStrippedRadioButton->isChecked())
 		config.graphics2D.bgMode = Config::BGMode::bgStripped;
 
 	config.texture.enableHalosRemoval = ui->halosRemovalCheckBox->isChecked() ? 1 : 0;
-	config.graphics2D.enableNativeResTexrects = ui->nativeRes2D_checkBox->isChecked() ? 1 : 0;
+	config.graphics2D.enableNativeResTexrects = ui->nativeRes2DComboBox->currentIndex();
 
 	config.frameBufferEmulation.enable = ui->frameBufferCheckBox->isChecked() ? 1 : 0;
 
@@ -493,7 +503,7 @@ void ConfigDialog::accept(bool justSave) {
 	config.frameBufferEmulation.copyFromRDRAM = ui->RenderFBCheckBox->isChecked() ? 1 : 0;
 	config.frameBufferEmulation.copyDepthToMainDepthBuffer = ui->copyDepthToMainDepthBufferCheckBox->isChecked() ? 1 : 0;
 
-	config.frameBufferEmulation.N64DepthCompare = ui->n64DepthCompareCheckBox->isChecked() ? 1 : 0;
+	config.frameBufferEmulation.N64DepthCompare = ui->n64DepthCompareComboBox->currentIndex();
 	config.frameBufferEmulation.forceDepthBufferClear = ui->forceDepthBufferClearCheckBox->isChecked() ? 1 : 0;
 
 	if (ui->aspectComboBox->currentIndex() == 2)
@@ -539,6 +549,7 @@ void ConfigDialog::accept(bool justSave) {
 	config.textureFilter.txHiresFullAlphaChannel = ui->alphaChannelCheckBox->isChecked() ? 1 : 0;
 	config.textureFilter.txHresAltCRC = ui->alternativeCRCCheckBox->isChecked() ? 1 : 0;
 	config.textureFilter.txDump = ui->textureDumpCheckBox->isChecked() ? 1 : 0;
+	config.textureFilter.txReloadHiresTex = ui->textureReloadCheckBox->isChecked() ? 1 : 0;
 
 	config.textureFilter.txCacheCompression = ui->compressCacheCheckBox->isChecked() ? 1 : 0;
 	config.textureFilter.txForce16bpp = ui->force16bppCheckBox->isChecked() ? 1 : 0;
@@ -760,7 +771,7 @@ void ConfigDialog::on_aliasingWarningLabel_linkActivated(QString link)
 {
 	if (link == "#n64DepthCompare") {
 		ui->tabWidget->setCurrentIndex(2);
-		ui->n64DepthCompareCheckBox->setStyleSheet("background:yellow");
+		ui->n64DepthCompareComboBox->setStyleSheet("background:yellow");
 	}
 }
 
@@ -804,13 +815,6 @@ void ConfigDialog::on_frameBufferCheckBox_toggled(bool checked)
 		ui->noaaRadioButton->setChecked(true);
 
 	ui->frameBufferCheckBox->setStyleSheet("");
-}
-
-void ConfigDialog::on_n64DepthCompareCheckBox_toggled(bool checked)
-{
-	if (checked && ui->msaaRadioButton->isChecked())
-		ui->fxaaRadioButton->setChecked(true);
-	ui->n64DepthCompareCheckBox->setStyleSheet("");
 }
 
 void ConfigDialog::on_gammaLevelSpinBox_valueChanged(double /*value*/)
@@ -887,7 +891,7 @@ void ConfigDialog::on_tabWidget_currentChanged(int tab)
 		m_fontsInited = true;
 	}
 
-	ui->n64DepthCompareCheckBox->setStyleSheet("");
+	ui->n64DepthCompareComboBox->setStyleSheet("");
 	ui->frameBufferCheckBox->setStyleSheet("");
 }
 
@@ -976,4 +980,19 @@ void ConfigDialog::on_removeProfilePushButton_clicked()
 		_init(true);
 		ui->removeProfilePushButton->setDisabled(ui->profilesComboBox->count() == 3);
 	}
+}
+
+void ConfigDialog::on_nativeRes2DComboBox_currentIndexChanged(int index)
+{
+	ui->fixTexrectFrame->setEnabled(index == 0);
+}
+
+void ConfigDialog::on_n64DepthCompareComboBox_currentIndexChanged(int index)
+{
+	ui->aliasingWarningFrame->setVisible(index > 0);
+	ui->aliasingSliderFrame->setDisabled(index > 0);
+	if (index > 0 && ui->msaaRadioButton->isChecked())
+		ui->fxaaRadioButton->setChecked(true);
+	ui->msaaRadioButton->setDisabled(index > 0);
+	ui->n64DepthCompareComboBox->setStyleSheet("");
 }

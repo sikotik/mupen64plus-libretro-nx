@@ -49,7 +49,7 @@ void VI_UpdateSize()
 
 	VI.real_height = vEnd > vStart ? (((vEnd - vStart) >> 1) * vScale) >> 10 : 0;
 	VI.width = *REG.VI_WIDTH;
-	VI.interlaced = (*REG.VI_STATUS & 0x40) != 0;
+	VI.interlaced = (*REG.VI_STATUS & VI_STATUS_SERRATE_ENABLED) != 0;
 
 	if (VI.interlaced) {
 		f32 fullWidth = 640.0f;
@@ -82,7 +82,7 @@ void VI_UpdateSize()
 //	const int fsaa = ((*REG.VI_STATUS) >> 8) & 3;
 //	const int divot = ((*REG.VI_STATUS) >> 4) & 1;
 	FrameBufferList & fbList = frameBufferList();
-	FrameBuffer * pBuffer = fbList.findBuffer(VI.lastOrigin);
+	FrameBuffer * pBuffer = fbList.findBuffer(VI.lastOrigin & 0xffffff);
 	DepthBuffer * pDepthBuffer = pBuffer != nullptr ? pBuffer->m_pDepthBuffer : nullptr;
 	if (config.frameBufferEmulation.enable &&
 		((interlacedPrev != VI.interlaced) ||
@@ -131,7 +131,7 @@ void VI_UpdateScreen()
 
 	if (config.frameBufferEmulation.enable) {
 
-		FrameBuffer * pBuffer = frameBufferList().findBuffer(*REG.VI_ORIGIN);
+		FrameBuffer * pBuffer = frameBufferList().findBuffer(*REG.VI_ORIGIN & 0xffffff);
 		if (pBuffer == nullptr) {
 			gDP.changed |= CHANGED_CPU_FB_WRITE;
 		} else if (!FBInfo::fbInfo.isSupported() &&
@@ -164,23 +164,23 @@ void VI_UpdateScreen()
 						wnd.updateScale();
 						bVIUpdated = true;
 					}
-					const u32 size = *REG.VI_STATUS & 3;
+					const u32 size = *REG.VI_STATUS & VI_STATUS_TYPE_32;
 					if (VI.height > 0 && size > G_IM_SIZ_8b  && VI.width > 0)
-						frameBufferList().saveBuffer(*REG.VI_ORIGIN, G_IM_FMT_RGBA, size, VI.width, true);
+						frameBufferList().saveBuffer(*REG.VI_ORIGIN & 0xffffff, G_IM_FMT_RGBA, size, VI.width, true);
 				}
 			}
 //			if ((((*REG.VI_STATUS) & 3) > 0) && (gDP.colorImage.changed || bCFB)) { // Does not work in release build!!!
-			if (((*REG.VI_STATUS) & 3) > 0) {
+			if (((*REG.VI_STATUS) & VI_STATUS_TYPE_32) > 0) {
 				if (!bVIUpdated) {
 					VI_UpdateSize();
 					bVIUpdated = true;
 				}
-				FrameBuffer_CopyFromRDRAM(*REG.VI_ORIGIN, bCFB);
+				FrameBuffer_CopyFromRDRAM(*REG.VI_ORIGIN & 0xffffff, bCFB);
 			}
 			frameBufferList().renderBuffer();
 			frameBufferList().clearBuffersChanged();
 			VI.lastOrigin = *REG.VI_ORIGIN;
-		} 
+		}
 	} else {
 		if (gDP.changed & CHANGED_COLORBUFFER) {
 			frameBufferList().renderBuffer();

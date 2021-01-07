@@ -109,6 +109,8 @@ void RSP_CheckDLCounter()
 
 void RSP_ProcessDList()
 {
+	RSP.LLE = false;
+
 	if (ConfigOpen || dwnd().isResizeWindow()) {
 		*REG.MI_INTR |= MI_INTR_DP;
 		CheckInterrupts();
@@ -223,7 +225,7 @@ void RSP_SetDefaultState()
 	gSP.matrix.modelView[0][2][2] = 1.0f;
 	gSP.matrix.modelView[0][3][3] = 1.0f;
 
-	gSP.clipRatio = 2U;
+	gSP.clipRatio = 1U;
 
 	gDP.otherMode._u64 = 0U;
 	gDP.otherMode.bi_lerp0 = gDP.otherMode.bi_lerp1 = 1;
@@ -303,9 +305,6 @@ void RSP_Init()
 		config.generalEmulation.hacks |= hack_clearAloneDepthBuffer;
 	else if (strstr(RSP.romname, (const char *)"STARCRAFT 64") != nullptr)
 		config.generalEmulation.hacks |= hack_StarCraftBackgrounds;
-	else if (strstr(RSP.romname, (const char *)"POKEMON STADIUM 2") != nullptr ||
-			 strstr(RSP.romname, (const char *)"Bottom of the 9th") != nullptr)
-		config.generalEmulation.hacks |= hack_texrect_shade_alpha;
 	else if (strstr(RSP.romname, (const char *)"THE LEGEND OF ZELDA") != nullptr ||
 			 strstr(RSP.romname, (const char *)"ZELDA MASTER QUEST") != nullptr)
 		config.generalEmulation.hacks |= hack_subscreen | hack_ZeldaMonochrome;

@@ -33,11 +33,15 @@ void Config::resetToDefaults()
 	texture.screenShotFormat = 0;
 
 	generalEmulation.enableLOD = 1;
-	generalEmulation.enableNoise = 1;
+	generalEmulation.enableHiresNoiseDithering = 0;
+	generalEmulation.enableDitheringPattern = 0;
+	generalEmulation.enableDitheringQuantization = 1;
+	generalEmulation.rdramImageDitheringMode = BufferDitheringMode::bdmBlueNoise;
 	generalEmulation.enableHWLighting = 0;
 	generalEmulation.enableCustomSettings = 1;
 	generalEmulation.enableShadersStorage = 1;
 	generalEmulation.enableLegacyBlending = 0;
+	generalEmulation.enableHybridFilter = 1;
 	generalEmulation.hacks = 0;
 #if defined(OS_ANDROID) || defined(OS_IOS)
 	generalEmulation.enableFragmentDepthWrite = 0;
@@ -50,7 +54,7 @@ void Config::resetToDefaults()
 #endif
 
 	graphics2D.correctTexrectCoords = tcDisable;
-	graphics2D.enableNativeResTexrects = 0;
+	graphics2D.enableNativeResTexrects = NativeResTexrectsMode::ntDisable;
 	graphics2D.bgMode = BGMode::bgOnePiece;
 
 	frameBufferEmulation.enable = 1;
@@ -58,7 +62,7 @@ void Config::resetToDefaults()
 	frameBufferEmulation.copyFromRDRAM = 0;
 	frameBufferEmulation.copyAuxToRDRAM = 0;
 	frameBufferEmulation.copyToRDRAM = ctDoubleBuffer;
-	frameBufferEmulation.N64DepthCompare = 0;
+	frameBufferEmulation.N64DepthCompare = dcDisable;
 	frameBufferEmulation.forceDepthBufferClear = 0;
 	frameBufferEmulation.aspect = a43;
 	frameBufferEmulation.bufferSwapMode = bsOnVerticalInterrupt;
@@ -83,6 +87,7 @@ void Config::resetToDefaults()
 	textureFilter.txHiresFullAlphaChannel = 1;
 	textureFilter.txHresAltCRC = 0;
 	textureFilter.txDump = 0;
+	textureFilter.txReloadHiresTex = 0;
 
 	textureFilter.txForce16bpp = 0;
 	textureFilter.txCacheCompression = 1;
@@ -135,7 +140,7 @@ bool isHWLightingAllowed()
 
 void Config::validate()
 {
-	if (frameBufferEmulation.enable != 0 && frameBufferEmulation.N64DepthCompare != 0)
+	if (frameBufferEmulation.enable != 0 && frameBufferEmulation.N64DepthCompare != dcDisable)
 		video.multisampling = 0;
 	if (frameBufferEmulation.nativeResFactor == 1) {
 		graphics2D.enableNativeResTexrects = 0;

@@ -23,6 +23,7 @@
 #include "RSP.h"
 #include "RDP.h"
 #include "VI.h"
+#include "Log.h"
 
 using namespace graphics;
 
@@ -41,12 +42,12 @@ GraphicsDrawer::~GraphicsDrawer()
 {
 }
 
-void GraphicsDrawer::addTriangle(int _v0, int _v1, int _v2)
+void GraphicsDrawer::addTriangle(u32 _v0, u32 _v1, u32 _v2)
 {
 	const u32 firstIndex = triangles.num;
-	triangles.elements[triangles.num++] = _v0;
-	triangles.elements[triangles.num++] = _v1;
-	triangles.elements[triangles.num++] = _v2;
+	triangles.elements[triangles.num++] = static_cast<u16>(_v0);
+	triangles.elements[triangles.num++] = static_cast<u16>(_v1);
+	triangles.elements[triangles.num++] = static_cast<u16>(_v2);
 	triangles.maxElement = std::max(triangles.maxElement, _v0);
 	triangles.maxElement = std::max(triangles.maxElement, _v1);
 	triangles.maxElement = std::max(triangles.maxElement, _v2);
@@ -118,7 +119,7 @@ void GraphicsDrawer::_updateDepthUpdate() const
 
 void GraphicsDrawer::_updateDepthCompare() const
 {
-	if (config.frameBufferEmulation.N64DepthCompare != 0) {
+	if (config.frameBufferEmulation.N64DepthCompare != Config::dcDisable) {
 		gfxContext.enable(enable::DEPTH_TEST, false);
 		gfxContext.enableDepthWrite(false);
 	}
@@ -236,6 +237,16 @@ float _adjustViewportX(f32 _X0)
 	return (_X0 + halfVP - halfX) * dwnd().getAdjustScale() + halfX - halfVP;
 }
 
+inline
+void _adjustViewportToClipRatio(s32 & x, s32 & y, s32 & width, s32 & height)
+{
+	x -= static_cast<s32>(gSP.clipRatio - 1) * width / 2;
+	y -= static_cast<s32>(gSP.clipRatio - 1) * height / 2;
+	width *= gSP.clipRatio;
+	height *= gSP.clipRatio;
+}
+
+
 void GraphicsDrawer::_updateViewport() const
 {
 	DisplayWindow & wnd = DisplayWindow::get();
@@ -246,10 +257,12 @@ void GraphicsDrawer::_updateViewport() const
 		float Xf = gSP.viewport.vscale[0] < 0 ? (gSP.viewport.x + gSP.viewport.vscale[0] * 2.0f) : gSP.viewport.x;
 		if (_needAdjustCoordinate(wnd))
 			Xf = _adjustViewportX(Xf);
-		const s32 X = (s32)(Xf * scaleX);
-		const s32 Y = (s32)(gSP.viewport.y * scaleY);
-		gfxContext.setViewport(X, Y,
-			std::max((s32)(gSP.viewport.width * scaleX), 0), std::max((s32)(gSP.viewport.height * scaleY), 0));
+		s32 X = static_cast<s32>(Xf * scaleX);
+		s32 Y = static_cast<s32>(gSP.viewport.y * scaleY);
+		s32 WIDTH = std::max(static_cast<s32>(gSP.viewport.width * scaleX), 0);
+		s32 HEIGHT = std::max(static_cast<s32>(gSP.viewport.height * scaleY), 0);
+		_adjustViewportToClipRatio(X, Y, WIDTH, HEIGHT);
+		gfxContext.setViewport(X, Y, WIDTH, HEIGHT);
 	} else {
 		const f32 scaleX = pCurrentBuffer->m_scale;
 		const f32 scaleY = pCurrentBuffer->m_scale;
@@ -257,12 +270,14 @@ void GraphicsDrawer::_updateViewport() const
 		Xf += f32(pCurrentBuffer->m_originX);
 		if (_needAdjustCoordinate(wnd))
 			Xf = _adjustViewportX(Xf);
-		const s32 X = roundup(Xf, scaleX);
+		s32 X = roundup(Xf, scaleX);
 		float Yf = gSP.viewport.vscale[1] < 0 ? (gSP.viewport.y + gSP.viewport.vscale[1] * 2.0f) : gSP.viewport.y;
 		Yf += f32(pCurrentBuffer->m_originY);
-		const s32 Y = roundup(Yf, scaleY);
-		gfxContext.setViewport(X, Y,
-			std::max(roundup(gSP.viewport.width, scaleX), 0), std::max(roundup(gSP.viewport.height, scaleY), 0));
+		s32 Y = roundup(Yf, scaleY);
+		s32 WIDTH = std::max(roundup(gSP.viewport.width, scaleX), 0);
+		s32 HEIGHT = std::max(roundup(gSP.viewport.height, scaleY), 0);
+		_adjustViewportToClipRatio(X, Y, WIDTH, HEIGHT);
+		gfxContext.setViewport(X, Y, WIDTH, HEIGHT);
 	}
 	gSP.changed &= ~CHANGED_VIEWPORT;
 }
@@ -282,18 +297,23 @@ void GraphicsDrawer::_updateScreenCoordsViewport(const FrameBuffer * _pBuffer) c
 		viewportScaleY = wnd.getScaleY();
 	} else {
 		bufferWidth = pCurrentBuffer->m_width;
-		bufferHeight = VI_GetMaxBufferHeight(bufferWidth);
+		bufferHeight = VI_GetMaxBufferHeight(static_cast<u16>(bufferWidth));
 		viewportScaleX = viewportScaleY = pCurrentBuffer->m_scale;
 		X = roundup(f32(pCurrentBuffer->m_originX), viewportScaleX);
 		Y = roundup(f32(pCurrentBuffer->m_originY), viewportScaleY);
+		if (RSP.LLE || gSP.viewport.width == 0.0f) {
+			gSP.viewport.width = f32(bufferWidth);
+			gSP.viewport.height = f32(bufferHeight);
+		}
 	}
-
-	gfxContext.setViewport(X, Y, roundup(f32(bufferWidth), viewportScaleX), roundup(f32(bufferHeight), viewportScaleY));
+	s32 WIDTH = roundup(f32(bufferWidth), viewportScaleX);
+	s32 HEIGHT = roundup(f32(bufferHeight), viewportScaleY);
+	_adjustViewportToClipRatio(X, Y, WIDTH, HEIGHT);
+	gfxContext.setViewport(X, Y, WIDTH, HEIGHT);
 	gSP.changed |= CHANGED_VIEWPORT;
 }
 
-static
-void _legacySetBlendMode()
+void GraphicsDrawer::_legacyBlending() const
 {
 	const u32 blendmode = gDP.otherMode.l >> 16;
 	// 0x7000 = CVG_X_ALPHA|ALPHA_CVG_SEL|FORCE_BL
@@ -456,48 +476,36 @@ void _legacySetBlendMode()
 	}
 }
 
-bool GraphicsDrawer::_setUnsupportedBlendMode() const
+void GraphicsDrawer::_ordinaryBlending() const
 {
-	if (gDP.otherMode.cycleType != G_CYC_2CYCLE)
-		return false;
 
-	// Modes, which shader blender can't emulate
-	const u32 mode = _SHIFTR(gDP.otherMode.l, 16, 16);
-	switch (mode) {
-	case 0x0040:
-		// Mia Hamm Soccer
-		// clr_in * a_in + clr_mem * (1-a)
-		// clr_in * a_in + clr_in * (1-a)
-	case 0x0050:
-		// A Bug's Life
-		// clr_in * a_in + clr_mem * (1-a)
-		// clr_in * a_in + clr_mem * (1-a)
-		gfxContext.enable(enable::BLEND, true);
-		gfxContext.setBlending(blend::SRC_ALPHA, blend::ONE_MINUS_SRC_ALPHA);
-		return true;
-	case 0x0150:
-		// Tony Hawk
-		// clr_in * a_in + clr_mem * (1-a)
-		// clr_in * a_fog + clr_mem * (1-a_fog)
-		if ((config.generalEmulation.hacks & hack_TonyHawk) != 0) {
+	// Set unsupported blend modes
+	if (gDP.otherMode.cycleType == G_CYC_2CYCLE) {
+		const u32 mode = _SHIFTR(gDP.otherMode.l, 16, 16);
+		switch (mode) {
+		case 0x0040:
+			// Mia Hamm Soccer
+			// clr_in * a_in + clr_mem * (1-a)
+			// clr_in * a_in + clr_in * (1-a)
+		case 0x0050:
+			// A Bug's Life
+			// clr_in * a_in + clr_mem * (1-a)
+			// clr_in * a_in + clr_mem * (1-a)
 			gfxContext.enable(enable::BLEND, true);
 			gfxContext.setBlending(blend::SRC_ALPHA, blend::ONE_MINUS_SRC_ALPHA);
-			return true;
+			return;
+		case 0x0150:
+			// Tony Hawk
+			// clr_in * a_in + clr_mem * (1-a)
+			// clr_in * a_fog + clr_mem * (1-a_fog)
+			if ((config.generalEmulation.hacks & hack_TonyHawk) != 0) {
+				gfxContext.enable(enable::BLEND, true);
+				gfxContext.setBlending(blend::SRC_ALPHA, blend::ONE_MINUS_SRC_ALPHA);
+				return;
+			}
+			break;
 		}
-		break;
 	}
-	return false;
-}
-
-void GraphicsDrawer::_setBlendMode() const
-{
-	if (config.generalEmulation.enableLegacyBlending != 0) {
-		_legacySetBlendMode();
-		return;
-	}
-
-	if (_setUnsupportedBlendMode())
-		return;
 
 	if (gDP.otherMode.forceBlender != 0 && gDP.otherMode.cycleType < G_CYC_COPY) {
 		BlendParam srcFactor = blend::ONE;
@@ -513,7 +521,8 @@ void GraphicsDrawer::_setBlendMode() const
 					return;
 				}
 				memFactorSource = 0;
-			} else if (gDP.otherMode.c2_m2a == 1) {
+			}
+			else if (gDP.otherMode.c2_m2a == 1) {
 				memFactorSource = 1;
 			}
 			if (gDP.otherMode.c2_m2a == 0 && gDP.otherMode.c2_m2b == 1) {
@@ -530,8 +539,7 @@ void GraphicsDrawer::_setBlendMode() const
 					return;
 				}
 				memFactorSource = 0;
-			}
-			else if (gDP.otherMode.c1_m2a == 1) {
+			} else if (gDP.otherMode.c1_m2a == 1) {
 				memFactorSource = 1;
 			}
 			if (gDP.otherMode.c1_m2a == 0 && gDP.otherMode.c1_m2b == 1) {
@@ -619,6 +627,61 @@ void GraphicsDrawer::_setBlendMode() const
 	}
 }
 
+void GraphicsDrawer::_dualSourceBlending() const
+{
+	if (gDP.otherMode.cycleType < G_CYC_COPY) {
+		BlendParam srcFactor = blend::ONE;
+		BlendParam dstFactor = blend::SRC1_COLOR;
+		BlendParam srcFactorAlpha = blend::ONE;
+		BlendParam dstFactorAlpha = blend::SRC1_ALPHA;
+		if (gDP.otherMode.forceBlender != 0) {
+			if (gDP.otherMode.cycleType == G_CYC_2CYCLE) {
+				if (gDP.otherMode.c2_m2a != 1 && gDP.otherMode.c2_m2b == 1) {
+					srcFactor = blend::DST_ALPHA;
+				}
+				if (gDP.otherMode.c2_m2a == 1 && gDP.otherMode.c2_m2b == 1) {
+					dstFactor = blend::DST_ALPHA;
+				}
+			} else {
+				if (gDP.otherMode.c1_m2a != 1 && gDP.otherMode.c1_m2b == 1) {
+					srcFactor = blend::DST_ALPHA;
+				}
+				if (gDP.otherMode.c1_m2a == 1 && gDP.otherMode.c2_m2b == 1) {
+					dstFactor = blend::DST_ALPHA;
+				}
+			}
+		} else if ((config.generalEmulation.hacks & hack_blastCorps) != 0 &&
+			gSP.texture.on == 0 && currentCombiner()->usesTexture()) { // Blast Corps
+			srcFactor = blend::ZERO;
+			dstFactor = blend::ONE;
+		}
+		gfxContext.enable(enable::BLEND, true);
+		gfxContext.setBlendingSeparate(srcFactor, dstFactor, srcFactorAlpha, dstFactorAlpha);
+	} else {
+		gfxContext.enable(enable::BLEND, false);
+	}
+}
+
+void GraphicsDrawer::setBlendMode(bool _forceLegacyBlending) const
+{
+	if (_forceLegacyBlending || config.generalEmulation.enableLegacyBlending != 0) {
+		_legacyBlending();
+		return;
+	}
+
+	if (Context::DualSourceBlending && !isTexrectDrawerMode()) {
+		_dualSourceBlending();
+		return;
+	}
+
+	if (Context::FramebufferFetchColor && !isTexrectDrawerMode()) {
+		gfxContext.enable(enable::BLEND, false);
+		return;
+	}
+
+	_ordinaryBlending();
+}
+
 void GraphicsDrawer::_updateTextures() const
 {
 	//For some reason updating the texture cache on the first frame of LOZ:OOT causes a nullptr Pointer exception...
@@ -663,7 +726,7 @@ void GraphicsDrawer::_updateStates(DrawingState _drawingState) const
 	}
 
 	if ((gDP.changed & (CHANGED_RENDERMODE | CHANGED_CYCLETYPE))) {
-		_setBlendMode();
+		setBlendMode();
 		gDP.changed &= ~(CHANGED_RENDERMODE | CHANGED_CYCLETYPE);
 	}
 
@@ -674,7 +737,7 @@ void GraphicsDrawer::_updateStates(DrawingState _drawingState) const
 
 	if (isCurrentColorImageDepthImage() &&
 		config.generalEmulation.enableFragmentDepthWrite != 0 &&
-		config.frameBufferEmulation.N64DepthCompare == 0) {
+		config.frameBufferEmulation.N64DepthCompare == Config::dcDisable) {
 		// Current render target is depth buffer.
 		// Shader will set gl_FragDepth to shader color, see ShaderCombiner ctor
 		// Here we enable depth buffer write.
@@ -705,17 +768,17 @@ void GraphicsDrawer::_updateStates(DrawingState _drawingState) const
 	}
 }
 
-void GraphicsDrawer::_prepareDrawTriangle()
+void GraphicsDrawer::_prepareDrawTriangle(DrawingState _drawingState)
 {
 	m_texrectDrawer.draw();
 
 	if ((m_modifyVertices & MODIFY_XY) != 0)
 		gSP.changed &= ~CHANGED_VIEWPORT;
 
-	if (gSP.changed || gDP.changed)
-		_updateStates(DrawingState::Triangle);
+	m_drawingState = _drawingState;
 
-	m_drawingState = DrawingState::Triangle;
+	if (gSP.changed || gDP.changed)
+		_updateStates(_drawingState);
 
 	bool bFlatColors = false;
 	if (!RSP.LLE && (gSP.geometryMode & G_LIGHTING) == 0) {
@@ -742,7 +805,7 @@ void GraphicsDrawer::drawTriangles()
 		return;
 	}
 
-	_prepareDrawTriangle();
+	_prepareDrawTriangle(DrawingState::Triangle);
 
 	Context::DrawTriangleParameters triParams;
 	triParams.mode = drawmode::TRIANGLES;
@@ -776,16 +839,24 @@ void GraphicsDrawer::drawScreenSpaceTriangle(u32 _numVtx, graphics::DrawModePara
 	if (_numVtx == 0 || !_canDraw())
 		return;
 
+	ValueKeeper<u32> otherMode(gSP.clipRatio, 1U);
+
 	f32 maxY = 0;
 	for (u32 i = 0; i < _numVtx; ++i) {
 		SPVertex & vtx = m_dmaVertices[i];
 		vtx.modify = MODIFY_ALL;
 		maxY = std::max(maxY, vtx.y);
+
+		vtx.clip = 0;
+		if (vtx.x > gSP.viewport.width) vtx.clip |= CLIP_POSX;
+		if (vtx.x < 0) vtx.clip |= CLIP_NEGX;
+		if (vtx.y > gSP.viewport.height) vtx.clip |= CLIP_POSY;
+		if (vtx.y < 0) vtx.clip |= CLIP_NEGY;
 	}
 	m_modifyVertices = MODIFY_ALL;
 
 	gSP.changed &= ~CHANGED_GEOMETRYMODE; // Don't update cull mode
-	_prepareDrawTriangle();
+	_prepareDrawTriangle(DrawingState::ScreenSpaceTriangle);
 	gfxContext.enable(enable::CULL_FACE, false);
 
 	Context::DrawTriangleParameters triParams;
@@ -798,7 +869,18 @@ void GraphicsDrawer::drawScreenSpaceTriangle(u32 _numVtx, graphics::DrawModePara
 	g_debugger.addTriangles(triParams);
 	m_dmaVerticesNum = 0;
 
-	frameBufferList().setBufferChanged(maxY);
+#ifndef OLD_LLE
+	if (config.frameBufferEmulation.enable != 0) {
+		const f32 maxY = renderTriangles(m_dmaVertices.data(), nullptr, _numVtx);
+		frameBufferList().setBufferChanged(maxY);
+		if (config.frameBufferEmulation.copyDepthToRDRAM == Config::cdSoftwareRender &&
+			gDP.otherMode.depthUpdate != 0) {
+			FrameBuffer * pCurrentDepthBuffer = frameBufferList().findBuffer(gDP.depthImageAddress);
+			if (pCurrentDepthBuffer != nullptr)
+				pCurrentDepthBuffer->setDirty();
+		}
+	}
+#endif
 	gSP.changed |= CHANGED_GEOMETRYMODE;
 }
 
@@ -806,7 +888,7 @@ void GraphicsDrawer::drawDMATriangles(u32 _numVtx)
 {
 	if (_numVtx == 0 || !_canDraw())
 		return;
-	_prepareDrawTriangle();
+	_prepareDrawTriangle(DrawingState::Triangle);
 
 
 	Context::DrawTriangleParameters triParams;
@@ -831,7 +913,7 @@ void GraphicsDrawer::drawDMATriangles(u32 _numVtx)
 	}
 }
 
-void GraphicsDrawer::_drawThickLine(int _v0, int _v1, float _width)
+void GraphicsDrawer::_drawThickLine(u32 _v0, u32 _v1, float _width)
 {
 	if ((gSP.geometryMode & G_LIGHTING) == 0) {
 		if ((gSP.geometryMode & G_SHADE) == 0) {
@@ -868,26 +950,24 @@ void GraphicsDrawer::_drawThickLine(int _v0, int _v1, float _width)
 	pVtx[0] = triangles.vertices[_v0];
 	pVtx[0].x = pVtx[0].x / pVtx[0].w * gSP.viewport.vscale[0] + gSP.viewport.vtrans[0];
 	pVtx[0].y = ySign * pVtx[0].y / pVtx[0].w * gSP.viewport.vscale[1] + gSP.viewport.vtrans[1];
-	pVtx[0].z = pVtx[0].z / pVtx[0].w * gSP.viewport.vscale[2] + gSP.viewport.vtrans[2];
+	pVtx[0].z = pVtx[0].z / pVtx[0].w;
 	pVtx[1] = pVtx[0];
 
 	pVtx[2] = triangles.vertices[_v1];
 	pVtx[2].x = pVtx[2].x / pVtx[2].w * gSP.viewport.vscale[0] + gSP.viewport.vtrans[0];
 	pVtx[2].y = ySign * pVtx[2].y / pVtx[2].w * gSP.viewport.vscale[1] + gSP.viewport.vtrans[1];
-	pVtx[2].z = pVtx[2].z / pVtx[2].w * gSP.viewport.vscale[2] + gSP.viewport.vtrans[2];
+	pVtx[2].z = pVtx[2].z / pVtx[2].w;
 	pVtx[3] = pVtx[2];
 
 	if (fabs(pVtx[0].y - pVtx[2].y) < 0.0001) {
 		const f32 Y = pVtx[0].y;
 		pVtx[0].y = pVtx[2].y = Y - _width;
 		pVtx[1].y = pVtx[3].y = Y + _width;
-	}
-	else if (fabs(pVtx[0].x - pVtx[2].x) < 0.0001) {
+	} else if (fabs(pVtx[0].x - pVtx[2].x) < 0.0001) {
 		const f32 X = pVtx[0].x;
 		pVtx[0].x = pVtx[2].x = X - _width;
 		pVtx[1].x = pVtx[3].x = X + _width;
-	}
-	else {
+	} else {
 		const f32 X0 = pVtx[0].x;
 		const f32 Y0 = pVtx[0].y;
 		const f32 X1 = pVtx[2].x;
@@ -909,7 +989,7 @@ void GraphicsDrawer::_drawThickLine(int _v0, int _v1, float _width)
 	drawScreenSpaceTriangle(4);
 }
 
-void GraphicsDrawer::drawLine(int _v0, int _v1, float _width)
+void GraphicsDrawer::drawLine(u32 _v0, u32 _v1, float _width)
 {
 	m_texrectDrawer.draw();
 
@@ -942,6 +1022,7 @@ void GraphicsDrawer::drawLine(int _v0, int _v1, float _width)
 
 void GraphicsDrawer::drawRect(int _ulx, int _uly, int _lrx, int _lry)
 {
+	ValueKeeper<u32> otherMode(gSP.clipRatio, 1U);
 	m_texrectDrawer.draw();
 
 	if (!_canDraw())
@@ -962,16 +1043,16 @@ void GraphicsDrawer::drawRect(int _ulx, int _uly, int _lrx, int _lry)
 	calcCoordsScales(frameBufferList().getCurrent(), scaleX, scaleY);
 	const float Z = (gDP.otherMode.depthSource == G_ZS_PRIM) ? gDP.primDepth.z : 0.0f;
 	const float W = 1.0f;
-	m_rect[0].x = (float)_ulx * (2.0f * scaleX) - 1.0f;
-	m_rect[0].y = (float)_uly * (2.0f * scaleY) - 1.0f;
+	m_rect[0].x = static_cast<f32>(_ulx) * (2.0f * scaleX) - 1.0f;
+	m_rect[0].y = static_cast<f32>(_uly) * (2.0f * scaleY) - 1.0f;
 	m_rect[0].z = Z;
 	m_rect[0].w = W;
-	m_rect[1].x = (float)_lrx * (2.0f * scaleX) - 1.0f;
+	m_rect[1].x = static_cast<f32>(_lrx) * (2.0f * scaleX) - 1.0f;
 	m_rect[1].y = m_rect[0].y;
 	m_rect[1].z = Z;
 	m_rect[1].w = W;
 	m_rect[2].x = m_rect[0].x;
-	m_rect[2].y = (float)_lry * (2.0f * scaleY) - 1.0f;
+	m_rect[2].y = static_cast<f32>(_lry) * (2.0f * scaleY) - 1.0f;
 	m_rect[2].z = Z;
 	m_rect[2].w = W;
 	m_rect[3].x = m_rect[1].x;
@@ -980,7 +1061,7 @@ void GraphicsDrawer::drawRect(int _ulx, int _uly, int _lrx, int _lry)
 	m_rect[3].w = W;
 
 	DisplayWindow & wnd = dwnd();
-	if (wnd.isAdjustScreen() && (gDP.colorImage.width > VI.width * 98 / 100) && ((u32)(_lrx - _ulx) < VI.width * 9 / 10)) {
+	if (wnd.isAdjustScreen() && (gDP.colorImage.width > VI.width * 98 / 100) && (static_cast<u32>(_lrx - _ulx) < VI.width * 9 / 10)) {
 		const float scale = wnd.getAdjustScale();
 		for (u32 i = 0; i < 4; ++i)
 			m_rect[i].x *= scale;
@@ -1011,7 +1092,7 @@ bool texturedRectShadowMap(const GraphicsDrawer::TexturedRectParams &)
 			pCurrentBuffer->m_pDepthBuffer->activateDepthBufferTexture(pCurrentBuffer);
 			CombinerInfo::get().setDepthFogCombiner();
 			// DepthFogCombiner does not support shader blending.
-			_legacySetBlendMode();
+			dwnd().getDrawer().setBlendMode(true);
 			return false;
 		}
 	}
@@ -1026,10 +1107,12 @@ bool texturedRectDepthBufferCopy(const GraphicsDrawer::TexturedRectParams & _par
 	// Data from depth buffer loaded into TMEM and then rendered to RDRAM by texrect.
 	// Works only with depth buffer emulation enabled.
 	// Load of arbitrary data to that area causes weird camera rotation in CBFD.
+	if (_params.uly != 0.0f || std::min(_params.lry, gDP.scissor.lry) != 1.0f)
+		return false;
 	const gDPTile * pTile = gSP.textureTile[0];
 	if (pTile->loadType == LOADTYPE_BLOCK && gDP.textureImage.size == 2 &&
 		gDP.textureImage.address >= gDP.depthImageAddress &&
-		gDP.textureImage.address < (gDP.depthImageAddress + gDP.colorImage.width*gDP.scissor.lry*2)) {
+		gDP.textureImage.address < (gDP.depthImageAddress + gDP.colorImage.width*VI.height*2)) {
 		if (config.frameBufferEmulation.copyDepthToRDRAM == Config::cdDisable)
 			return true;
 		FrameBuffer * pBuffer = frameBufferList().getCurrent();
@@ -1045,10 +1128,10 @@ bool texturedRectDepthBufferCopy(const GraphicsDrawer::TexturedRectParams & _par
 			RDP_RepeatLastLoadBlock();
 		}
 
-		const u32 width = (u32)(_params.lrx - _params.ulx);
-		const u32 ulx = (u32)_params.ulx;
-		u16 * pSrc = ((u16*)TMEM) + _params.s/32;
-		u16 *pDst = (u16*)(RDRAM + gDP.colorImage.address);
+		const u32 width = static_cast<u32>(_params.lrx - _params.ulx);
+		const u32 ulx = static_cast<u32>(_params.ulx);
+		u16 * pSrc = reinterpret_cast<u16*>(TMEM) + _params.s/32;
+		u16 *pDst = reinterpret_cast<u16*>(RDRAM + gDP.colorImage.address);
 		for (u32 x = 0; x < width; ++x)
 			pDst[(ulx + x) ^ 1] = swapword(pSrc[x]);
 
@@ -1076,13 +1159,13 @@ bool texturedRectBGCopy(const GraphicsDrawer::TexturedRectParams & _params)
 	if (flry > gDP.scissor.lry)
 		flry = gDP.scissor.lry;
 
-	const u32 width = (u32)(_params.lrx - _params.ulx);
+	const u32 width = static_cast<u32>(_params.lrx - _params.ulx);
 	const u32 tex_width = gSP.textureTile[0]->line << 3;
-	const u32 uly = (u32)_params.uly;
-	const u32 lry = (u32)flry;
+	const u32 uly = static_cast<u32>(_params.uly);
+	const u32 lry = static_cast<u32>(flry);
 
 	u8 * texaddr = RDRAM + gDP.loadInfo[gSP.textureTile[0]->tmem].texAddress + tex_width*_params.t/32 + _params.s/32;
-	u8 * fbaddr = RDRAM + gDP.colorImage.address + (u32)_params.ulx;
+	u8 * fbaddr = RDRAM + gDP.colorImage.address + static_cast<u32>(_params.ulx);
 	//	LOG(LOG_VERBOSE, "memrect (%d, %d, %d, %d), ci_width: %d texaddr: 0x%08lx fbaddr: 0x%08lx\n", (u32)_params.ulx, uly, (u32)_params.lrx, lry, gDP.colorImage.width, gSP.textureTile[0]->imageAddress + tex_width*(u32)_params.ult + (u32)_params.uls, gDP.colorImage.address + (u32)_params.ulx);
 
 	for (u32 y = uly; y < lry; ++y) {
@@ -1120,16 +1203,16 @@ bool texturedRectPaletteMod(const GraphicsDrawer::TexturedRectParams & _params)
 	// Modify palette for Paper Mario "2D lighting" effect
 	if (gDP.scissor.lrx != 16 || gDP.scissor.lry != 1 || _params.lrx != 16 || _params.lry != 1)
 		return false;
-	u8 envr = (u8)(gDP.envColor.r * 31.0f);
-	u8 envg = (u8)(gDP.envColor.g * 31.0f);
-	u8 envb = (u8)(gDP.envColor.b * 31.0f);
-	u16 env16 = (u16)((envr << 11) | (envg << 6) | (envb << 1) | 1);
-	u8 prmr = (u8)(gDP.primColor.r * 31.0f);
-	u8 prmg = (u8)(gDP.primColor.g * 31.0f);
-	u8 prmb = (u8)(gDP.primColor.b * 31.0f);
-	u16 prim16 = (u16)((prmr << 11) | (prmg << 6) | (prmb << 1) | 1);
-	u16 * src = (u16*)&TMEM[256];
-	u16 * dst = (u16*)(RDRAM + gDP.colorImage.address);
+	u8 envr = static_cast<u8>(gDP.envColor.r * 31.0f);
+	u8 envg = static_cast<u8>(gDP.envColor.g * 31.0f);
+	u8 envb = static_cast<u8>(gDP.envColor.b * 31.0f);
+	u16 env16 = static_cast<u16>((envr << 11) | (envg << 6) | (envb << 1) | 1);
+	u8 prmr = static_cast<u8>(gDP.primColor.r * 31.0f);
+	u8 prmg = static_cast<u8>(gDP.primColor.g * 31.0f);
+	u8 prmb = static_cast<u8>(gDP.primColor.b * 31.0f);
+	u16 prim16 = static_cast<u16>((prmr << 11) | (prmg << 6) | (prmb << 1) | 1);
+	u16 * src = reinterpret_cast<u16*>(&TMEM[256]);
+	u16 * dst = reinterpret_cast<u16*>(RDRAM + gDP.colorImage.address);
 	for (u32 i = 0; i < 16; ++i)
 		dst[i ^ 1] = (src[i << 2] & 0x100) ? prim16 : env16;
 	return true;
@@ -1137,12 +1220,13 @@ bool texturedRectPaletteMod(const GraphicsDrawer::TexturedRectParams & _params)
 
 // Special processing of textured rect.
 // Return true if actuial rendering is not necessary
-bool(*texturedRectSpecial)(const GraphicsDrawer::TexturedRectParams & _params) = nullptr;
+static bool(*texturedRectSpecial)(const GraphicsDrawer::TexturedRectParams & _params) = nullptr;
 
 void GraphicsDrawer::drawTexturedRect(const TexturedRectParams & _params)
 {
 	gSP.changed &= ~CHANGED_GEOMETRYMODE; // Don't update cull mode
 	m_drawingState = DrawingState::TexRect;
+	ValueKeeper<u32> otherMode(gSP.clipRatio, 1U);
 
 	if (m_texrectDrawer.canContinue()) {
 		CombinerInfo & cmbInfo = CombinerInfo::get();
@@ -1229,12 +1313,12 @@ void GraphicsDrawer::drawTexturedRect(const TexturedRectParams & _params)
 			s16 S = _params.s;
 			if (gSP.textureTile[t]->shifts > 10) {
 				const u32 shifts = 16 - gSP.textureTile[t]->shifts;
-				S = (s16)(S << shifts);
-				shiftScaleS = (f32)(1 << shifts);
+				S = static_cast<s16>(S << shifts);
+				shiftScaleS = static_cast<f32>(1 << shifts);
 			} else if (gSP.textureTile[t]->shifts > 0) {
 				const u32 shifts = gSP.textureTile[t]->shifts;
-				S = (s16)(S >> shifts);
-				shiftScaleS /= (f32)(1 << shifts);
+				S = static_cast<s16>(S >> shifts);
+				shiftScaleS /= static_cast<f32>(1 << shifts);
 			}
 			const f32 uls = _FIXED2FLOAT(S, 5);
 			const f32 lrs = uls + offsetX * shiftScaleS;
@@ -1242,12 +1326,12 @@ void GraphicsDrawer::drawTexturedRect(const TexturedRectParams & _params)
 			s16 T = _params.t;
 			if (gSP.textureTile[t]->shiftt > 10) {
 				const u32 shiftt = 16 - gSP.textureTile[t]->shiftt;
-				T = (s16)(T << shiftt);
-				shiftScaleT = (f32)(1 << shiftt);
+				T = static_cast<s16>(T << shiftt);
+				shiftScaleT = static_cast<f32>(1 << shiftt);
 			} else if (gSP.textureTile[t]->shiftt > 0) {
 				const u32 shiftt = gSP.textureTile[t]->shiftt;
-				T = (s16)(T >> shiftt);
-				shiftScaleT /= (f32)(1 << shiftt);
+				T = static_cast<s16>(T >> shiftt);
+				shiftScaleT /= static_cast<f32>(1 << shiftt);
 			}
 			const f32 ult = _FIXED2FLOAT(T, 5);
 			const f32 lrt = ult + offsetY * shiftScaleT;
@@ -1278,15 +1362,15 @@ void GraphicsDrawer::drawTexturedRect(const TexturedRectParams & _params)
 
 				if ((cache.current[t]->mirrorS == 0 && cache.current[t]->maskS == 0 &&
 					(texST[t].s0 < texST[t].s1 ?
-					texST[t].s0 >= 0.0 && texST[t].s1 <= (float)cache.current[t]->width :
-					texST[t].s1 >= 0.0 && texST[t].s0 <= (float)cache.current[t]->width))
+					texST[t].s0 >= 0.0f && texST[t].s1 <= static_cast<f32>(cache.current[t]->width) :
+					texST[t].s1 >= 0.0f && texST[t].s0 <= static_cast<f32>(cache.current[t]->width)))
 					|| (cache.current[t]->maskS == 0 && (texST[t].s0 < -1024.0f || texST[t].s1 > 1023.99f)))
 					texParams.wrapS = textureParameters::WRAP_CLAMP_TO_EDGE;
 
 				if (cache.current[t]->mirrorT == 0 &&
 					(texST[t].t0 < texST[t].t1 ?
-					texST[t].t0 >= 0.0f && texST[t].t1 <= (float)cache.current[t]->height :
-					texST[t].t1 >= 0.0f && texST[t].t0 <= (float)cache.current[t]->height))
+					texST[t].t0 >= 0.0f && texST[t].t1 <= static_cast<f32>(cache.current[t]->height) :
+					texST[t].t1 >= 0.0f && texST[t].t0 <= static_cast<f32>(cache.current[t]->height)))
 					texParams.wrapT = textureParameters::WRAP_CLAMP_TO_EDGE;
 
 				if (texParams.wrapS.isValid() || texParams.wrapT.isValid()) {
@@ -1297,10 +1381,18 @@ void GraphicsDrawer::drawTexturedRect(const TexturedRectParams & _params)
 				}
 			}
 
-			texST[t].s0 *= cache.current[t]->scaleS;
-			texST[t].t0 *= cache.current[t]->scaleT;
-			texST[t].s1 *= cache.current[t]->scaleS;
-			texST[t].t1 *= cache.current[t]->scaleT;
+			texST[t].s0 *= cache.current[t]->hdRatioS;
+			texST[t].t0 *= cache.current[t]->hdRatioT;
+			texST[t].s1 *= cache.current[t]->hdRatioS;
+			texST[t].t1 *= cache.current[t]->hdRatioT;
+
+			if (gDP.otherMode.textureFilter != G_TF_POINT && gDP.otherMode.cycleType != G_CYC_COPY) {
+				texST[t].s0 -= 0.5f;
+				texST[t].t0 -= 0.5f;
+				texST[t].s1 -= 0.5f;
+				texST[t].t1 -= 0.5f;
+			}
+
 		}
 	}
 
@@ -1348,7 +1440,7 @@ void GraphicsDrawer::drawTexturedRect(const TexturedRectParams & _params)
 
 	if (wnd.isAdjustScreen() &&
 		(_params.forceAjustScale ||
-		((gDP.colorImage.width > VI.width * 98 / 100) && ((u32)(_params.lrx - _params.ulx) < VI.width * 9 / 10))))
+		((gDP.colorImage.width > VI.width * 98 / 100) && (static_cast<u32>(_params.lrx - _params.ulx) < VI.width * 9 / 10))))
 	{
 		const float scale = wnd.getAdjustScale();
 		for (u32 i = 0; i < 4; ++i)
@@ -1451,7 +1543,7 @@ void GraphicsDrawer::clearColorBuffer(float *_pColor)
 		gfxContext.clearColorBuffer(0.0f, 0.0f, 0.0f, 0.0f);
 }
 
-bool GraphicsDrawer::isRejected(s32 _v0, s32 _v1, s32 _v2) const
+bool GraphicsDrawer::isRejected(u32 _v0, u32 _v1, u32 _v2) const
 {
 	if (!GBI.isRej() || gSP.clipRatio < 2)
 		return false;
@@ -1466,10 +1558,12 @@ bool GraphicsDrawer::isRejected(s32 _v0, s32 _v1, s32 _v2) const
 		rejectBox.lry = gDP.scissor.lry + scissorHeight2;
 		gDP.changed ^= CHANGED_REJECT_BOX;
 	}
-	s32 verts[3] = { _v0, _v1, _v2 };
+	u32 verts[3] = { _v0, _v1, _v2 };
 	const f32 ySign = GBI.isNegativeY() ? -1.0f : 1.0f;
 	for (u32 i = 0; i < 3; ++i) {
 		const SPVertex & v = triangles.vertices[verts[i]];
+		if ((v.modify & MODIFY_XY) != 0)
+			continue;
 		const f32 sx = gSP.viewport.vtrans[0] + (v.x / v.w) * gSP.viewport.vscale[0];
 		if (sx < rejectBox.ulx)
 			return true;
@@ -1559,7 +1653,7 @@ void GraphicsDrawer::copyTexturedRect(const CopyRectParams & _params)
 		gfxContext.setTextureParameters(texParams);
 	}
 
-	gfxContext.setViewport(0, 0, _params.dstWidth, _params.dstHeight);
+	gfxContext.setViewport(0, 0, static_cast<s32>(_params.dstWidth), static_cast<s32>(_params.dstHeight));
 	gfxContext.enable(enable::CULL_FACE, false);
 	gfxContext.enable(enable::BLEND, false);
 
@@ -1623,7 +1717,7 @@ void GraphicsDrawer::_initStates()
 	gfxContext.enableDepthWrite(false);
 	gfxContext.setDepthCompare(compare::ALWAYS);
 
-	if (config.frameBufferEmulation.N64DepthCompare != 0) {
+	if (config.frameBufferEmulation.N64DepthCompare != Config::dcDisable) {
 		gfxContext.enable(enable::DEPTH_TEST, false);
 		gfxContext.enable(enable::POLYGON_OFFSET_FILL, false);
 	}
@@ -1638,11 +1732,12 @@ void GraphicsDrawer::_initStates()
 	}
 
 	DisplayWindow & wnd = DisplayWindow::get();
-	gfxContext.setViewport(0, wnd.getHeightOffset(), wnd.getScreenWidth(), wnd.getScreenHeight());
+	gfxContext.setViewport(0, static_cast<s32>(wnd.getHeightOffset()),
+						   static_cast<s32>(wnd.getScreenWidth()), static_cast<s32>(wnd.getScreenHeight()));
 
 	gfxContext.clearColorBuffer(0.0f, 0.0f, 0.0f, 0.0f);
 
-	srand((unsigned int)time(nullptr));
+	srand(static_cast<u32>(time(nullptr)));
 
 	wnd.swapBuffers();
 }
